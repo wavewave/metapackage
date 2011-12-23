@@ -30,7 +30,8 @@ Library
                    devadmin == 0.4.*, 
                    Cabal >= 1.8 && < 1.12, 
                    configurator == 0.2.*,
-                   containers == 0.4.*
+                   containers == 0.4.*, 
+                   process == 1.0.*
   Exposed-Modules: 
                    Application.MetaPackage.ProgType
                    Application.MetaPackage.Job
