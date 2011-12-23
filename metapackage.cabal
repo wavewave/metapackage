@@ -9,7 +9,9 @@ Maintainer: 	Ian-Woo Kim <ianwookim@gmail.com>
 Build-Type: 	Simple
 Cabal-Version:  >= 1.8
 data-files:     
-
+                template/Setup.lhs
+                template/project.cabal.st
+          
 
 Executable metapackage
   Main-is: metapackage.hs
@@ -31,7 +33,9 @@ Library
                    Cabal >= 1.8 && < 1.12, 
                    configurator == 0.2.*,
                    containers == 0.4.*, 
-                   process == 1.0.*
+                   process == 1.0.*, 
+                   HStringTemplate == 0.6.*, 
+                   HStringTemplateHelpersIW == 0.0.*
   Exposed-Modules: 
                    Application.MetaPackage.ProgType
                    Application.MetaPackage.Job
@@ -39,6 +43,7 @@ Library
                    Application.MetaPackage.Config 
                    Application.MetaPackage.Build
   Other-Modules: 
+                   Paths_metapackage
 
  
 		 

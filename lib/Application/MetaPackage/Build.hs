@@ -14,9 +14,15 @@ import qualified Data.Map as M
 import Data.Monoid
 import Data.List (intercalate)
 
+
 import System.Directory
 import System.FilePath
 import System.Process
+
+import Text.StringTemplate
+import Text.StringTemplate.Helpers
+
+import Paths_metapackage
 import Prelude hiding (foldr1,foldr, mapM_, concatMap, concat)
 
 buildMetaPackage :: BuildConfiguration -> ProjectConfiguration 
@@ -26,18 +32,52 @@ buildMetaPackage bc pc mp = do
   gdescs <- getAllGenPkgDesc bc pc 
   let epkgsdesc = getAllModules gdescs mp
 
-  
-
-  either (putStrLn ) 
-         (mapM_ linkMod . concatMap (absolutePathModuleAll bc <$> fst <*> snd)) 
-         epkgsdesc 
-
--- mapM_ (mapM_ linkMod . snd) ) 
+  either putStrLn (makeMetaPackage bc mp) epkgsdesc 
 
 
---         epkgsdesc 
+makeMetaPackage :: BuildConfiguration -> MetaProject 
+                -> [(Project,[(FilePath,ModuleName)])] 
+                -> IO ()
+makeMetaPackage  bc mp allmodules = do 
+  (pkgpath,srcpath) <- initializeMetaPackage mp
+  let allmodnames = do 
+        (p,ns) <- allmodules
+        (fp,m) <- ns  
+        return m
+  makeCabalFile pkgpath mp allmodnames  
+  mapM_ (linkMod srcpath) . concatMap (absolutePathModuleAll bc <$> fst <*> snd) $ allmodules 
 
---  either (putStrLn ) ( mapM_ (putStrLn.show) .  map ((,) <$> modDirName <*> toFilePath ) ) epkgsdesc 
+makeCabalFile :: FilePath -> MetaProject 
+              -> [ModuleName]
+              -> IO ()
+makeCabalFile pkgpath mp modnames = do 
+  tmpldir <- getDataDir >>= return . (</> "template")
+  tmpl <- directoryGroup tmpldir 
+  let exposedmodules = concatMap ("\n          "++) 
+                       . map (intercalate "." . components) 
+                       $ modnames
+  let replacement = [ ("projname",metaProjectName mp)
+                    , ("licensetype", ""  ) 
+                    , ("executable", "" )
+                    , ("libdep", "" ) 
+                    , ("exedep", "")
+                    , ("exposedmodules", exposedmodules)
+                    , ("modulebase", "src")
+                    , ("progtype", "") 
+                    ] 
+  let cabalstr = renderTemplateGroup tmpl replacement "project.cabal"
+  writeFile (pkgpath </> metaProjectName mp <.> "cabal") cabalstr 
+                  
+
+initializeMetaPackage :: MetaProject -> IO (FilePath,FilePath)
+initializeMetaPackage mp = do 
+  cdir <- getCurrentDirectory 
+  let pkgpath = cdir </> (metaProjectName mp)
+      srcpath = cdir </> (metaProjectName mp </> "src")
+  createDirectory pkgpath
+  createDirectory srcpath 
+  return (pkgpath,srcpath)
+
 
 
 absolutePathModuleAll :: BuildConfiguration -> Project 
@@ -52,16 +92,16 @@ absolutePathModule bc proj (fp,modname) =
   let absolutify dir = bc_progbase bc </> projname proj </> dir
   in (absolutify fp,modname)
 
-linkMod :: (FilePath,ModuleName) -> IO () 
-linkMod (fp,modname) = do 
-  createModuleDirectory ("./src") modname
-  checkAndLinkModuleFile (fp,modname) 
+linkMod :: FilePath -> (FilePath,ModuleName) -> IO () 
+linkMod srcdir (fp,modname) = do 
+  createModuleDirectory srcdir modname
+  checkAndLinkModuleFile srcdir (fp,modname) 
 
-checkAndLinkModuleFile :: (FilePath,ModuleName) -> IO () 
-checkAndLinkModuleFile (fp,modname) = do 
+checkAndLinkModuleFile :: FilePath -> (FilePath,ModuleName) -> IO () 
+checkAndLinkModuleFile srcdir (fp,modname) = do 
   let origfilename = fp </> (toFilePath modname)
   doesFileExist (origfilename <.> "hs") >>= \x -> when x $ do 
-    system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ ("src" </>  toFilePath modname <.> "hs")
+    system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "hs")
     return ()
 -- putStrLn origfilename
 
