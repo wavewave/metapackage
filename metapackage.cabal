@@ -26,11 +26,17 @@ Library
   ghc-prof-options: -caf-all -auto-all
   Build-Depends: 
                    base>4, mtl>2, directory, filepath,
-                   cmdargs
+                   cmdargs >= 0.7 && < 0.10, 
+                   devadmin == 0.4.*, 
+                   Cabal >= 1.8 && < 1.12, 
+                   configurator == 0.2.*,
+                   containers == 0.4.*
   Exposed-Modules: 
-                   Application.MetaPackage.Type
+                   Application.MetaPackage.ProgType
                    Application.MetaPackage.Job
                    Application.MetaPackage.Command
+                   Application.MetaPackage.Config 
+                   Application.MetaPackage.Build
   Other-Modules: 
 
  

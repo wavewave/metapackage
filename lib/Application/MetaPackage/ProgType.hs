@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module Application.MetaPackage.Type where 
+module Application.MetaPackage.ProgType where 
 
 import System.Console.CmdArgs
 
