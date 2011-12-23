@@ -1,5 +1,7 @@
 module Application.MetaPackage.Build where
 
+import Debug.Trace
+
 import Distribution.Package
 import Distribution.PackageDescription
 import Distribution.ModuleName
@@ -12,10 +14,11 @@ import Application.DevAdmin.Project
 import Control.Applicative
 import Control.Monad hiding (mapM_,msum)
 import Data.Foldable
+import Data.Function
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Monoid
-import Data.List (intercalate,group)
+import Data.List (intercalate,group,sort,sortBy)
 
 
 import System.Directory
@@ -199,6 +202,7 @@ getDepsForOnePkg (proj,desc) =
 
 
 newtype DependencyEqName = DepEqName { unDepEqName :: Dependency } 
+    deriving (Show)
 
 instance Eq DependencyEqName where
   (DepEqName (Dependency n1 _))  == (DepEqName (Dependency n2 _))
@@ -220,13 +224,14 @@ instance Monoid VersionRange where
 
 intersectionDeps :: MetaProject -> [Dependency] -> [Dependency] 
 intersectionDeps mp deps = 
-  let grouped = group . map DepEqName $ deps
+  let grouped = group . sortBy (compare `on` dep_pkgname) . map DepEqName $ deps
       projnames = map projname . metaProjectPkg $ mp
       filterMP x = case (dep_pkgname . head) x of 
                      PackageName pname -> if elem pname projnames
                                             then Nothing
                                             else Just (PackageName pname,x)
-      filtered = mapMaybe filterMP grouped 
+      filtered = mapMaybe filterMP grouped
+ 
   in map (Dependency <$> fst <*> simplifyVersionRange . mconcat . map dep_vrange . snd) filtered
   
 -- | dependency string 
@@ -239,12 +244,12 @@ versionString (Version b _ ) = intercalate "." (map show b)
 
 versionRangeString :: VersionRange -> String
 versionRangeString AnyVersion = "" 
-versionRangeString (ThisVersion v) = "== " ++ versionString v
-versionRangeString (LaterVersion v) = "> " ++ versionString v
-versionRangeString (EarlierVersion v) = "< " ++ versionString v
+versionRangeString (ThisVersion v) = "==" ++ versionString v
+versionRangeString (LaterVersion v) = ">" ++ versionString v
+versionRangeString (EarlierVersion v) = "<" ++ versionString v
 versionRangeString (UnionVersionRanges vr1 vr2) =
-  versionRangeString vr1 ++ " || " ++ versionRangeString vr2
+  "(" ++ versionRangeString vr1 ++ ") || (" ++ versionRangeString vr2 ++ ")"
 versionRangeString (IntersectVersionRanges vr1 vr2) = 
-  versionRangeString vr1 ++ " && " ++ versionRangeString vr2 
-versionRangeString (WildcardVersion v) = "== " ++ versionString v ++ ".*"
+  "(" ++ versionRangeString vr1 ++ ") && (" ++ versionRangeString vr2 ++ ")"
+versionRangeString (WildcardVersion v) = "==" ++ versionString v ++ ".*"
 versionRangeString _ = "???"
