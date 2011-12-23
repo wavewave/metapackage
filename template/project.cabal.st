@@ -12,7 +12,7 @@ $datafiles$
 
 
 Library
-  hs-source-dirs: lib
+  hs-source-dirs: src
   ghc-options: 	-Wall -O2 -threaded -funbox-strict-fields -fno-warn-unused-do-bind
   ghc-prof-options: -caf-all -auto-all
   Build-Depends: 

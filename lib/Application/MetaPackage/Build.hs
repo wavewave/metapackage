@@ -136,10 +136,20 @@ linkMod srcdir (fp,modname) = do
 checkAndLinkModuleFile :: FilePath -> (FilePath,ModuleName) -> IO () 
 checkAndLinkModuleFile srcdir (fp,modname) = do 
   let origfilename = fp </> (toFilePath modname)
-  doesFileExist (origfilename <.> "hs") >>= \x -> when x $ do 
-    system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "hs")
-    return ()
+  chk_hs <- doesFileExist (origfilename <.> "hs") 
+  chk_hsc <- doesFileExist (origfilename <.> "hsc")
+  chk_chs <- doesFileExist (origfilename <.> "chs")
 
+  if chk_hs 
+    then do system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "hs")
+            return ()
+    else if chk_hsc 
+      then do system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "hsc")
+              return ()
+      else if chk_chs
+        then do system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "chs")
+                return ()
+        else return ()
 
 -- | create module directory if not exist 
 
@@ -234,13 +244,12 @@ intersectionDeps mp deps =
  
   in map (Dependency <$> fst <*> simplifyVersionRange . mconcat . map dep_vrange . snd) filtered
   
--- | dependency string 
-{-
-dependencyString :: [Dependency] -> String 
-dependencyString =  -}
+-- | version to string 
 
 versionString :: Version -> String 
 versionString (Version b _ ) = intercalate "." (map show b)
+
+-- | version range to string for cabal file
 
 versionRangeString :: VersionRange -> String
 versionRangeString AnyVersion = "" 
