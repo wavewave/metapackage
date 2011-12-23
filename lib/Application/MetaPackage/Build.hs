@@ -66,7 +66,7 @@ depString mp pkgs =
   let depsall = intersectionDeps mp . concatMap getDepsForOnePkg $ pkgs
       formatter (Dependency (PackageName pname) vr) = 
         pname ++ versionRangeString vr 
-  in unlines . map ((++ ",") . ("         " ++) . formatter) $ depsall
+  in intercalate ",\n" . map (("         " ++) . formatter) $ depsall
 
 
 
@@ -144,10 +144,10 @@ checkAndLinkModuleFile srcdir (fp,modname) = do
     then do system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "hs")
             return ()
     else if chk_hsc 
-      then do system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "hsc")
+      then do system $ "ln -s " ++ (origfilename <.> "hsc") ++ " " ++ (srcdir </>  toFilePath modname <.> "hsc")
               return ()
       else if chk_chs
-        then do system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "chs")
+        then do system $ "ln -s " ++ (origfilename <.> "chs") ++ " " ++ (srcdir </>  toFilePath modname <.> "chs")
                 return ()
         else return ()
 
