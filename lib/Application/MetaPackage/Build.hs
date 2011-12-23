@@ -32,16 +32,20 @@ buildMetaPackage :: BuildConfiguration -> ProjectConfiguration
 buildMetaPackage bc pc mp = do
   putStrLn "buildMetaPackage called"
   gdescs <- getAllGenPkgDesc bc pc 
-  let epkgsdesc = getAllModules gdescs mp
+  let epkgsdesc = getAllProjPkg gdescs mp 
+
+
+-- getAllModules gdescs mp
 
   either putStrLn (makeMetaPackage bc mp) epkgsdesc 
 
 -- | driver IO action for make a meta package
 
 makeMetaPackage :: BuildConfiguration -> MetaProject 
-                -> [(Project,[(FilePath,ModuleName)])] 
+                -> [ProjectPkg]
                 -> IO ()
-makeMetaPackage  bc mp allmodules = do 
+makeMetaPackage  bc mp pkgs = do
+  let allmodules = getAllModules pkgs  
   (pkgpath,srcpath) <- initializeMetaPackage mp
   let allmodnames = do 
         (p,ns) <- allmodules
@@ -135,25 +139,54 @@ modDirName :: ModuleName -> FilePath
 modDirName = toFilePath . fromString . intercalate "." . init . components 
 
 
--- | get a library module information for a single package
+type ProjectPkg = (Project,GenericPackageDescription)
 
-getModulesForOnePkg :: M.Map String GenericPackageDescription -> Project 
-                    -> Either String [(FilePath,ModuleName)]
-getModulesForOnePkg namepkgmap proj = 
+-- | get Project and Generic Package Description
+
+getProjPkg :: M.Map String GenericPackageDescription -> Project  
+           -> Either String ProjectPkg
+getProjPkg namepkgmap proj = 
   let mpkgdesc = M.lookup (projname proj) namepkgmap 
   in maybe (Left ("package " ++ projname proj ++ " doesn't exist"))
-           (Right . getModules) 
+           (Right . (,) proj ) 
            mpkgdesc      
+  
+-- | get a library pkg information for all packages in the metapackage
 
--- | get a library module information for all packages in the metapackage
+getAllProjPkg :: [GenericPackageDescription] -> MetaProject 
+              -> Either String [ProjectPkg]
+getAllProjPkg gdescs mp = 
+  let namepkgpair = map ((,) <$> getPkgName <*> id) gdescs 
+      namepkgmap = M.fromList namepkgpair
+      pkgs = metaProjectPkg mp
+  in mapM (getProjPkg namepkgmap) pkgs 
 
-getAllModules :: [GenericPackageDescription] -> MetaProject 
-              -> Either String [(Project,[(FilePath,ModuleName)])] 
-getAllModules gdescs mp = 
+
+-- | get a library module information for a single package
+
+getModulesForOnePkg :: ProjectPkg -> [(FilePath,ModuleName)]
+getModulesForOnePkg (proj,desc) = getModules desc 
+  
+{-  let mpkgdesc = M.lookup (projname proj) namepkgmap 
+  in maybe (Left ("package " ++ projname proj ++ " doesn't exist"))
+           (Right . getModules) 
+           mpkgdesc     -}
+
+-- | get all library module information
+
+getAllModules :: [ProjectPkg] -> [(Project,[(FilePath,ModuleName)])] 
+getAllModules pkgs = map ((,) <$> fst <*> getModulesForOnePkg) pkgs 
+
+
+{-
   let namepkgpair = map ((,) <$> getPkgName <*> id) gdescs 
       namepkgmap = M.fromList namepkgpair
       pkgs = metaProjectPkg mp
       makeresult  pkg = (,) pkg <$> getModulesForOnePkg namepkgmap pkg
   in mapM makeresult pkgs 
+-}
 
-
+{-
+getDepsForOnePkg :: M.Map String GenericPackageDescription -> Project 
+                 -> Either String [
+-}
