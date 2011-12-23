@@ -25,6 +25,8 @@ import Text.StringTemplate.Helpers
 import Paths_metapackage
 import Prelude hiding (foldr1,foldr, mapM_, concatMap, concat)
 
+-- | starting job
+
 buildMetaPackage :: BuildConfiguration -> ProjectConfiguration 
                  -> MetaProject -> IO ()
 buildMetaPackage bc pc mp = do
@@ -34,6 +36,7 @@ buildMetaPackage bc pc mp = do
 
   either putStrLn (makeMetaPackage bc mp) epkgsdesc 
 
+-- | driver IO action for make a meta package
 
 makeMetaPackage :: BuildConfiguration -> MetaProject 
                 -> [(Project,[(FilePath,ModuleName)])] 
@@ -46,6 +49,8 @@ makeMetaPackage  bc mp allmodules = do
         return m
   makeCabalFile pkgpath mp allmodnames  
   mapM_ (linkMod srcpath) . concatMap (absolutePathModuleAll bc <$> fst <*> snd) $ allmodules 
+
+-- | create a metapackage cabal file name. 
 
 makeCabalFile :: FilePath -> MetaProject 
               -> [ModuleName]
@@ -69,6 +74,8 @@ makeCabalFile pkgpath mp modnames = do
   writeFile (pkgpath </> metaProjectName mp <.> "cabal") cabalstr 
                   
 
+-- | create metapackage directory and return such created directory names
+
 initializeMetaPackage :: MetaProject -> IO (FilePath,FilePath)
 initializeMetaPackage mp = do 
   cdir <- getCurrentDirectory 
@@ -79,6 +86,7 @@ initializeMetaPackage mp = do
   return (pkgpath,srcpath)
 
 
+-- | for all modules 
 
 absolutePathModuleAll :: BuildConfiguration -> Project 
                          -> [(FilePath,ModuleName)] -> [(FilePath,ModuleName)]
@@ -86,16 +94,22 @@ absolutePathModuleAll bc proj xs =
   map (absolutePathModule bc proj) xs 
 
 
+-- | relative path info to absolute path info for modules 
+
 absolutePathModule :: BuildConfiguration -> Project 
                    -> (FilePath,ModuleName) -> (FilePath,ModuleName)
 absolutePathModule bc proj (fp,modname) = 
   let absolutify dir = bc_progbase bc </> projname proj </> dir
   in (absolutify fp,modname)
 
+-- | create module directory and link the original file in the destination.
+
 linkMod :: FilePath -> (FilePath,ModuleName) -> IO () 
 linkMod srcdir (fp,modname) = do 
   createModuleDirectory srcdir modname
   checkAndLinkModuleFile srcdir (fp,modname) 
+
+-- | check whether original source file exists and link it in the destination.
 
 checkAndLinkModuleFile :: FilePath -> (FilePath,ModuleName) -> IO () 
 checkAndLinkModuleFile srcdir (fp,modname) = do 
@@ -103,8 +117,9 @@ checkAndLinkModuleFile srcdir (fp,modname) = do
   doesFileExist (origfilename <.> "hs") >>= \x -> when x $ do 
     system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "hs")
     return ()
--- putStrLn origfilename
 
+
+-- | create module directory if not exist 
 
 createModuleDirectory :: FilePath -> ModuleName -> IO () 
 createModuleDirectory basedir modname = do 
@@ -114,10 +129,13 @@ createModuleDirectory basedir modname = do
   return ()
 
 
-
+-- | get module directory name (omitting last part of module) 
 
 modDirName :: ModuleName -> FilePath 
 modDirName = toFilePath . fromString . intercalate "." . init . components 
+
+
+-- | get a library module information for a single package
 
 getModulesForOnePkg :: M.Map String GenericPackageDescription -> Project 
                     -> Either String [(FilePath,ModuleName)]
@@ -126,6 +144,8 @@ getModulesForOnePkg namepkgmap proj =
   in maybe (Left ("package " ++ projname proj ++ " doesn't exist"))
            (Right . getModules) 
            mpkgdesc      
+
+-- | get a library module information for all packages in the metapackage
 
 getAllModules :: [GenericPackageDescription] -> MetaProject 
               -> Either String [(Project,[(FilePath,ModuleName)])] 
@@ -136,13 +156,4 @@ getAllModules gdescs mp =
       makeresult  pkg = (,) pkg <$> getModulesForOnePkg namepkgmap pkg
   in mapM makeresult pkgs 
 
---  mapM (liftM2 (,) <$> liftM projname <*> liftM2 getModulesForOnePkg namepkgmap) pkgs 
-
-
-{-      mmpkgsdesc = map (\k->M.lookup k namepkgmap) pkgs 
-      mpkgsdesc = foldr (liftA2 (:)) (Just [])  mmpkgsdesc 
-  in maybe (Left "some packages are not present") 
-           (Right . concatMap getModules)
-           mpkgsdesc 
--}
 
