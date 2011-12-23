@@ -1,18 +1,21 @@
 module Application.MetaPackage.Build where
 
+import Distribution.Package
 import Distribution.PackageDescription
 import Distribution.ModuleName
+import Distribution.Version
 
 import Application.MetaPackage.Config
 import Application.DevAdmin.Config 
 import Application.DevAdmin.Cabal
 import Application.DevAdmin.Project
 import Control.Applicative
-import Control.Monad hiding (mapM_)
+import Control.Monad hiding (mapM_,msum)
 import Data.Foldable
 import qualified Data.Map as M
+import Data.Maybe
 import Data.Monoid
-import Data.List (intercalate)
+import Data.List (intercalate,group)
 
 
 import System.Directory
@@ -23,7 +26,7 @@ import Text.StringTemplate
 import Text.StringTemplate.Helpers
 
 import Paths_metapackage
-import Prelude hiding (foldr1,foldr, mapM_, concatMap, concat)
+import Prelude hiding (foldr1,foldr, mapM_, concatMap, concat, sum, elem)
 
 -- | starting job
 
@@ -51,24 +54,36 @@ makeMetaPackage  bc mp pkgs = do
         (p,ns) <- allmodules
         (fp,m) <- ns  
         return m
-  makeCabalFile pkgpath mp allmodnames  
+  makeCabalFile pkgpath mp pkgs allmodnames  
   mapM_ (linkMod srcpath) . concatMap (absolutePathModuleAll bc <$> fst <*> snd) $ allmodules 
+  
+
+depString :: MetaProject -> [ProjectPkg] -> String 
+depString mp pkgs =  
+  let depsall = intersectionDeps mp . concatMap getDepsForOnePkg $ pkgs
+      formatter (Dependency (PackageName pname) vr) = 
+        pname ++ versionRangeString vr 
+  in unlines . map ((++ ",") . ("         " ++) . formatter) $ depsall
+
+
+
 
 -- | create a metapackage cabal file name. 
 
-makeCabalFile :: FilePath -> MetaProject 
+makeCabalFile :: FilePath -> MetaProject -> [ProjectPkg]
               -> [ModuleName]
               -> IO ()
-makeCabalFile pkgpath mp modnames = do 
+makeCabalFile pkgpath mp pkgs modnames = do 
   tmpldir <- getDataDir >>= return . (</> "template")
   tmpl <- directoryGroup tmpldir 
   let exposedmodules = concatMap ("\n          "++) 
                        . map (intercalate "." . components) 
                        $ modnames
+      libdep = depString mp pkgs 
   let replacement = [ ("projname",metaProjectName mp)
                     , ("licensetype", ""  ) 
                     , ("executable", "" )
-                    , ("libdep", "" ) 
+                    , ("libdep", libdep ) 
                     , ("exedep", "")
                     , ("exposedmodules", exposedmodules)
                     , ("modulebase", "src")
@@ -167,10 +182,6 @@ getAllProjPkg gdescs mp =
 getModulesForOnePkg :: ProjectPkg -> [(FilePath,ModuleName)]
 getModulesForOnePkg (proj,desc) = getModules desc 
   
-{-  let mpkgdesc = M.lookup (projname proj) namepkgmap 
-  in maybe (Left ("package " ++ projname proj ++ " doesn't exist"))
-           (Right . getModules) 
-           mpkgdesc     -}
 
 -- | get all library module information
 
@@ -178,15 +189,62 @@ getAllModules :: [ProjectPkg] -> [(Project,[(FilePath,ModuleName)])]
 getAllModules pkgs = map ((,) <$> fst <*> getModulesForOnePkg) pkgs 
 
 
-{-
-  let namepkgpair = map ((,) <$> getPkgName <*> id) gdescs 
-      namepkgmap = M.fromList namepkgpair
-      pkgs = metaProjectPkg mp
-      makeresult  pkg = (,) pkg <$> getModulesForOnePkg namepkgmap pkg
-  in mapM makeresult pkgs 
--}
+-- | get a library dep information 
 
+
+getDepsForOnePkg :: ProjectPkg -> [Dependency]
+getDepsForOnePkg (proj,desc) = 
+  let rlib = condLibrary desc
+  in maybe [] (condTreeConstraints) rlib
+
+
+newtype DependencyEqName = DepEqName { unDepEqName :: Dependency } 
+
+instance Eq DependencyEqName where
+  (DepEqName (Dependency n1 _))  == (DepEqName (Dependency n2 _))
+    = n1 == n2
+
+
+dep_pkgname :: DependencyEqName -> PackageName
+dep_pkgname (DepEqName (Dependency n1 _)) = n1 
+
+dep_vrange :: DependencyEqName -> VersionRange 
+dep_vrange (DepEqName (Dependency _ v)) = v 
+
+instance Monoid VersionRange where
+  mappend = intersectVersionRanges 
+  mempty = anyVersion
+
+
+-- | get intersection dep
+
+intersectionDeps :: MetaProject -> [Dependency] -> [Dependency] 
+intersectionDeps mp deps = 
+  let grouped = group . map DepEqName $ deps
+      projnames = map projname . metaProjectPkg $ mp
+      filterMP x = case (dep_pkgname . head) x of 
+                     PackageName pname -> if elem pname projnames
+                                            then Nothing
+                                            else Just (PackageName pname,x)
+      filtered = mapMaybe filterMP grouped 
+  in map (Dependency <$> fst <*> simplifyVersionRange . mconcat . map dep_vrange . snd) filtered
+  
+-- | dependency string 
 {-
-getDepsForOnePkg :: M.Map String GenericPackageDescription -> Project 
-                 -> Either String [
--}
+dependencyString :: [Dependency] -> String 
+dependencyString =  -}
+
+versionString :: Version -> String 
+versionString (Version b _ ) = intercalate "." (map show b)
+
+versionRangeString :: VersionRange -> String
+versionRangeString AnyVersion = "" 
+versionRangeString (ThisVersion v) = "== " ++ versionString v
+versionRangeString (LaterVersion v) = "> " ++ versionString v
+versionRangeString (EarlierVersion v) = "< " ++ versionString v
+versionRangeString (UnionVersionRanges vr1 vr2) =
+  versionRangeString vr1 ++ " || " ++ versionRangeString vr2
+versionRangeString (IntersectVersionRanges vr1 vr2) = 
+  versionRangeString vr1 ++ " && " ++ versionRangeString vr2 
+versionRangeString (WildcardVersion v) = "== " ++ versionString v ++ ".*"
+versionRangeString _ = "???"
