@@ -96,7 +96,15 @@ makeMetaPackage  bc mp pkgs = do
         return m
   makeCabalFile pkgpath mp pkgs allmodnames  
   mapM_ (linkMod srcpath) . concatMap (absolutePathModuleAll bc <$> fst <*> snd) $ allmodules 
-  
+  let allothermodnames = do 
+        (_,ns) <- getAllOtherModules pkgs
+        (_,m) <- ns 
+        return m
+      allothermodnamestrings = map components allothermodnames
+      pathsAction strs = when (take 6 (head strs) == "Paths_") $ do 
+                           let pkgname = drop 6 (head strs) 
+                           makePaths_xxxHsFile pkgpath mp (ProgProj pkgname)
+  mapM_ pathsAction allothermodnamestrings
 
 depString :: MetaProject -> [ProjectPkg] -> String 
 depString mp pkgs =  
@@ -108,14 +116,19 @@ depString mp pkgs =
 
 
 
+getTemplate :: IO (STGroup String)
+getTemplate = do 
+  tmpldir <- getDataDir >>= return . (</> "template")
+  directoryGroup tmpldir 
+  
+
 -- | create a metapackage cabal file name. 
 
 makeCabalFile :: FilePath -> MetaProject -> [ProjectPkg]
               -> [ModuleName]
               -> IO ()
 makeCabalFile pkgpath mp pkgs modnames = do 
-  tmpldir <- getDataDir >>= return . (</> "template")
-  tmpl <- directoryGroup tmpldir 
+  tmpl <- getTemplate
   let exposedmodules = concatMap ("\n          "++) 
                        . map (intercalate "." . components) 
                        $ modnames
@@ -320,4 +333,16 @@ getAllOtherModules :: [ProjectPkg] -> [(Project,[(FilePath,ModuleName)])]
 getAllOtherModules pkgs = map ((,) <$> fst <*> getOtherModulesForOnePkg) pkgs
 
 
--- | create data directories for each package
+-- | create Paths_package.hs for a package
+ 
+makePaths_xxxHsFile :: FilePath -> MetaProject -> Project -> IO ()
+makePaths_xxxHsFile pkgpath mp proj = do 
+  tmpl <- getTemplate
+  let pkgname = projname proj 
+      datapath = pkgpath </> "data_" ++ pkgname 
+      replacement = [ ( "pkgname", pkgname )
+                    , ( "datapath", datapath )
+                    ] 
+      hsstr = renderTemplateGroup tmpl replacement "Paths_xxx.hs" 
+  writeFile (pkgpath </> "src" </> "Paths_" ++ pkgname <.> "hs") hsstr
+
