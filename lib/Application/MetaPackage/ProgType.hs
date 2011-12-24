@@ -5,10 +5,14 @@ module Application.MetaPackage.ProgType where
 import System.Console.CmdArgs
 
 data Metapackage = Test 
+                 | Make 
               deriving (Show,Data,Typeable)
 
 test :: Metapackage
 test = Test 
 
-mode = modes [test]
+make :: Metapackage 
+make = Make
+
+mode = modes [test,make]
 

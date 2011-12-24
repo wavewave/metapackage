@@ -9,15 +9,24 @@ import Application.DevAdmin.Config
 import Control.Monad
 import Data.Maybe 
 
-startJob :: IO () 
-startJob = do 
-  putStrLn "job started"
+
+startTestJob :: IO () 
+startTestJob = do 
+  putStrLn "test job started"
   c1 <- loadConfigFile 
   mbc <- getBuildConfiguration c1
   mpc <- getProjectConfiguration c1 
   mmp <- getMetaProj =<< loadMetaProjConf "test.conf"
+  maybe (return ()) id (liftM3 testMetaPackage mbc mpc mmp )
 
+
+startMakeJob :: IO () 
+startMakeJob = do 
+  putStrLn "make job started"
+  c1 <- loadConfigFile 
+  mbc <- getBuildConfiguration c1
+  mpc <- getProjectConfiguration c1 
+  mmp <- getMetaProj =<< loadMetaProjConf "test.conf"
   maybe (return ()) id (liftM3 buildMetaPackage mbc mpc mmp )
 
-  -- putStrLn $ show mp  
 

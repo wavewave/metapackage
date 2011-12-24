@@ -31,19 +31,56 @@ import Text.StringTemplate.Helpers
 import Paths_metapackage
 import Prelude hiding (foldr1,foldr, mapM_, concatMap, concat, sum, elem)
 
--- | starting job
+doMetaPkgAction :: (BuildConfiguration -> MetaProject -> [ProjectPkg] -> IO ())
+                -> BuildConfiguration -> ProjectConfiguration -> MetaProject -> IO ()
+doMetaPkgAction action bc pc mp  = do
+  gdescs <- getAllGenPkgDesc bc pc 
+  let epkgsdesc = getAllProjPkg gdescs mp 
+  either putStrLn (action bc mp) epkgsdesc 
 
-buildMetaPackage :: BuildConfiguration -> ProjectConfiguration 
-                 -> MetaProject -> IO ()
-buildMetaPackage bc pc mp = do
+
+-- | just testing
+
+testMetaPackage :: BuildConfiguration -> ProjectConfiguration -> MetaProject -> IO ()
+testMetaPackage = doMetaPkgAction showPkgInfos
+
+
+-- | starting make job
+
+buildMetaPackage :: BuildConfiguration -> ProjectConfiguration -> MetaProject -> IO ()
+buildMetaPackage = doMetaPkgAction makeMetaPackage 
+
+-- | showPkgInfos 
+
+showPkgInfos :: BuildConfiguration -> MetaProject -> [ProjectPkg] -> IO ()
+showPkgInfos  bc mp pkgs = do
+  let allmodules = getAllModules pkgs  
+  (pkgpath,srcpath) <- testInitializeMetaPackage mp
+  let allmodnames = do 
+        (p,ns) <- allmodules
+        (fp,m) <- ns  
+        return m
+
+  let allothermodnames = do 
+        (_,ns) <- getAllOtherModules pkgs
+        (_,m) <- ns 
+        return m
+  mapM_ (putStrLn . show) allothermodnames        
+
+{-  makeCabalFile pkgpath mp pkgs allmodnames  
+  mapM_ (linkMod srcpath) . concatMap (absolutePathModuleAll bc <$> fst <*> snd) $ allmodules 
+
+-}
+
+
+
+
+
+{- bc pc mp = do
   putStrLn "buildMetaPackage called"
   gdescs <- getAllGenPkgDesc bc pc 
   let epkgsdesc = getAllProjPkg gdescs mp 
-
-
--- getAllModules gdescs mp
-
-  either putStrLn (makeMetaPackage bc mp) epkgsdesc 
+  either putStrLn (makeMetaPackage bc mp) epkgsdesc -} 
 
 -- | driver IO action for make a meta package
 
@@ -54,8 +91,8 @@ makeMetaPackage  bc mp pkgs = do
   let allmodules = getAllModules pkgs  
   (pkgpath,srcpath) <- initializeMetaPackage mp
   let allmodnames = do 
-        (p,ns) <- allmodules
-        (fp,m) <- ns  
+        (_,ns) <- allmodules 
+        (_,m) <- ns  
         return m
   makeCabalFile pkgpath mp pkgs allmodnames  
   mapM_ (linkMod srcpath) . concatMap (absolutePathModuleAll bc <$> fst <*> snd) $ allmodules 
@@ -105,6 +142,15 @@ initializeMetaPackage mp = do
       srcpath = cdir </> (metaProjectName mp </> "src")
   createDirectory pkgpath
   createDirectory srcpath 
+  return (pkgpath,srcpath)
+
+-- | just for testing
+
+testInitializeMetaPackage :: MetaProject -> IO (FilePath,FilePath)
+testInitializeMetaPackage mp = do 
+  cdir <- getCurrentDirectory 
+  let pkgpath = cdir </> (metaProjectName mp)
+      srcpath = cdir </> (metaProjectName mp </> "src")
   return (pkgpath,srcpath)
 
 
@@ -262,3 +308,16 @@ versionRangeString (IntersectVersionRanges vr1 vr2) =
   "(" ++ versionRangeString vr1 ++ ") && (" ++ versionRangeString vr2 ++ ")"
 versionRangeString (WildcardVersion v) = "==" ++ versionString v ++ ".*"
 versionRangeString _ = "???"
+
+-- | get a library 'other module' information for a single package
+
+getOtherModulesForOnePkg :: ProjectPkg -> [(FilePath,ModuleName)]
+getOtherModulesForOnePkg (proj,desc) = getOtherModules desc
+
+-- | get all other module information
+
+getAllOtherModules :: [ProjectPkg] -> [(Project,[(FilePath,ModuleName)])]
+getAllOtherModules pkgs = map ((,) <$> fst <*> getOtherModulesForOnePkg) pkgs
+
+
+-- | create data directories for each package
