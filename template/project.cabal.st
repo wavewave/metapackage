@@ -11,6 +11,8 @@ data-files:
 $datafiles$
 
 
+$executables$
+
 Library
   hs-source-dirs: src
   ghc-options: 	-Wall -O2 -threaded -funbox-strict-fields -fno-warn-unused-do-bind

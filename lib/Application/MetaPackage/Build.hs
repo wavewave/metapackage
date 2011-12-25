@@ -65,22 +65,20 @@ showPkgInfos  bc mp pkgs = do
         (_,ns) <- getAllOtherModules pkgs
         (_,m) <- ns 
         return m
-  mapM_ (putStrLn . show) allothermodnames        
+  -- mapM_ (putStrLn . show) allothermodnames        
+  let lst = getExeFileAndCabalString bc "" pkgs 
+  
+  mapM_ (\(x,y)->do {putStrLn (show x); putStrLn y}) lst
 
-{-  makeCabalFile pkgpath mp pkgs allmodnames  
-  mapM_ (linkMod srcpath) . concatMap (absolutePathModuleAll bc <$> fst <*> snd) $ allmodules 
+linkExeSrcFile :: (FilePath,FilePath) -> IO ()
+linkExeSrcFile (src,dest) = do 
+  chk_src <- doesFileExist src
+  chk_dest <- doesFileExist dest 
+  when (chk_src && not chk_dest) $ do 
+    system $ "ln -s " ++ src ++ " " ++ dest
+    return ()
+  
 
--}
-
-
-
-
-
-{- bc pc mp = do
-  putStrLn "buildMetaPackage called"
-  gdescs <- getAllGenPkgDesc bc pc 
-  let epkgsdesc = getAllProjPkg gdescs mp 
-  either putStrLn (makeMetaPackage bc mp) epkgsdesc -} 
 
 -- | driver IO action for make a meta package
 
@@ -94,7 +92,7 @@ makeMetaPackage  bc mp pkgs = do
         (_,ns) <- allmodules 
         (_,m) <- ns  
         return m
-  makeCabalFile pkgpath mp pkgs allmodnames  
+
   mapM_ (linkMod srcpath) . concatMap (absolutePathModuleAll bc <$> fst <*> snd) $ allmodules 
   let allothermodnames = do 
         (_,ns) <- getAllOtherModules pkgs
@@ -106,14 +104,18 @@ makeMetaPackage  bc mp pkgs = do
                            makePaths_xxxHsFile pkgpath mp (ProgProj pkgname)
   mapM_ pathsAction allothermodnamestrings
 
+  let exelst = getExeFileAndCabalString bc srcpath pkgs 
+      exestr = concatMap snd exelst 
+  mapM_ (linkExeSrcFile . fst) exelst 
+  makeCabalFile pkgpath mp pkgs allmodnames exestr
+
 depString :: MetaProject -> [ProjectPkg] -> String 
 depString mp pkgs =  
   let depsall = intersectionDeps mp . concatMap getDepsForOnePkg $ pkgs
-      formatter (Dependency (PackageName pname) vr) = 
-        pname ++ versionRangeString vr 
-  in intercalate ",\n" . map (("         " ++) . formatter) $ depsall
+  in intercalate ",\n" . map (("         " ++) . depFormatter) $ depsall
 
-
+depFormatter :: Dependency -> String 
+depFormatter (Dependency (PackageName pname) vr) = pname ++ versionRangeString vr
 
 
 getTemplate :: IO (STGroup String)
@@ -126,8 +128,9 @@ getTemplate = do
 
 makeCabalFile :: FilePath -> MetaProject -> [ProjectPkg]
               -> [ModuleName]
+              -> String
               -> IO ()
-makeCabalFile pkgpath mp pkgs modnames = do 
+makeCabalFile pkgpath mp pkgs modnames exestr = do 
   tmpl <- getTemplate
   let exposedmodules = concatMap ("\n          "++) 
                        . map (intercalate "." . components) 
@@ -135,7 +138,7 @@ makeCabalFile pkgpath mp pkgs modnames = do
       libdep = depString mp pkgs 
   let replacement = [ ("projname",metaProjectName mp)
                     , ("licensetype", ""  ) 
-                    , ("executable", "" )
+                    , ("executables", exestr )
                     , ("libdep", libdep ) 
                     , ("exedep", "")
                     , ("exposedmodules", exposedmodules)
@@ -324,13 +327,13 @@ versionRangeString _ = "???"
 
 -- | get a library 'other module' information for a single package
 
-getOtherModulesForOnePkg :: ProjectPkg -> [(FilePath,ModuleName)]
-getOtherModulesForOnePkg (proj,desc) = getOtherModules desc
+getOtherModules41Pkg :: ProjectPkg -> [(FilePath,ModuleName)]
+getOtherModules41Pkg (proj,desc) = getOtherModules desc
 
 -- | get all other module information
 
 getAllOtherModules :: [ProjectPkg] -> [(Project,[(FilePath,ModuleName)])]
-getAllOtherModules pkgs = map ((,) <$> fst <*> getOtherModulesForOnePkg) pkgs
+getAllOtherModules pkgs = map ((,) <$> fst <*> getOtherModules41Pkg) pkgs
 
 
 -- | create Paths_package.hs for a package
@@ -346,3 +349,47 @@ makePaths_xxxHsFile pkgpath mp proj = do
       hsstr = renderTemplateGroup tmpl replacement "Paths_xxx.hs" 
   writeFile (pkgpath </> "src" </> "Paths_" ++ pkgname <.> "hs") hsstr
 
+-- | find executables 
+
+getExecutables41Pkg :: GenericPackageDescription 
+                    -> [(String,String,String,String,String)] 
+getExecutables41Pkg gdesc = do
+    (exename,node) <- condExecutables gdesc
+    let filename = (modulePath . condTreeData) node
+        srcdir = (head . hsSourceDirs . buildInfo . condTreeData) node
+        compileopt = intercalate " " . snd . head 
+                     . options . buildInfo . condTreeData $ node  
+        deps = intercalate ", ". map depFormatter . condTreeConstraints 
+               $ node 
+    return (exename,filename,srcdir,compileopt,deps)  
+
+getExeFileAndCabalString :: BuildConfiguration
+                         -> FilePath
+                         -> [ProjectPkg] 
+                         -> [((String,String),String)] 
+getExeFileAndCabalString bc srcpath pkgs = do 
+    p@(proj,desc) <- pkgs
+    x@(x1,x2,x3,x4,x5) <- (getExecutables41Pkg . snd) p
+    let cabalstr = mkExeStrInCabal x  
+        filepath = x3</>x2
+    return ((bc_progbase bc</>projname proj</>filepath, srcpath </> x2), cabalstr)
+
+
+mkExeStrInCabal :: (String,String,String,String,String) -> String
+mkExeStrInCabal (exename,filename,srcdir,compileopt,deps) = 
+  let tmpl = newSTMP execTemplate :: StringTemplate String 
+  in toString . setAttribute "exename" exename
+              . setAttribute "srcfilename"  filename  
+              . setAttribute "dirname" "src"
+              . setAttribute "option" compileopt
+              . setAttribute "dep" deps
+              $ tmpl
+
+execTemplate :: String 
+execTemplate = "\n\
+\Executable $exename$\n\
+\  Main-is: $srcfilename$\n\
+\  hs-source-dirs: $dirname$\n\
+\  ghc-options: $option$\n\
+\  Build-Depends: \n\
+\                   $dep$\n"
