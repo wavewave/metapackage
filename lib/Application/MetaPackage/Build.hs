@@ -12,7 +12,7 @@ import Application.DevAdmin.Config
 import Application.DevAdmin.Cabal
 import Application.DevAdmin.Project
 import Control.Applicative
-import Control.Monad hiding (mapM_,msum)
+import Control.Monad hiding (mapM_,msum,forM_)
 import Data.Foldable
 import Data.Function
 import qualified Data.Map as M
@@ -30,6 +30,9 @@ import Text.StringTemplate.Helpers
 
 import Paths_metapackage
 import Prelude hiding (foldr1,foldr, mapM_, concatMap, concat, sum, elem)
+
+type ProjectPkg = (Project,GenericPackageDescription)
+
 
 doMetaPkgAction :: (BuildConfiguration -> MetaProject -> [ProjectPkg] -> IO ())
                 -> BuildConfiguration -> ProjectConfiguration -> MetaProject -> IO ()
@@ -88,6 +91,9 @@ makeMetaPackage :: BuildConfiguration -> MetaProject
 makeMetaPackage  bc mp pkgs = do
   let allmodules = getAllModules pkgs  
   (pkgpath,srcpath) <- initializeMetaPackage mp
+  forM_ (map (projname . fst)  pkgs) $  \x ->   
+    system $ "ln -s " ++ bc_progbase bc </> x  ++  " " ++ pkgpath </> "data_" ++ x 
+
   let allmodnames = do 
         (_,ns) <- allmodules 
         (_,m) <- ns  
@@ -104,7 +110,7 @@ makeMetaPackage  bc mp pkgs = do
                            makePaths_xxxHsFile pkgpath mp (ProgProj pkgname)
   mapM_ pathsAction allothermodnamestrings
 
-  let exelst = getExeFileAndCabalString bc srcpath pkgs 
+  let exelst = getExeFileAndCabalString bc pkgpath pkgs 
       exestr = concatMap snd exelst 
   mapM_ (linkExeSrcFile . fst) exelst 
   makeCabalFile pkgpath mp pkgs allmodnames exestr
@@ -155,9 +161,12 @@ initializeMetaPackage :: MetaProject -> IO (FilePath,FilePath)
 initializeMetaPackage mp = do 
   cdir <- getCurrentDirectory 
   let pkgpath = cdir </> (metaProjectName mp)
-      srcpath = cdir </> (metaProjectName mp </> "src")
+      srcpath = cdir </> metaProjectName mp </> "src"
+      exepath = cdir </> (metaProjectName mp) </> "exe"
   createDirectory pkgpath
   createDirectory srcpath 
+  createDirectory exepath
+
   return (pkgpath,srcpath)
 
 -- | just for testing
@@ -229,7 +238,6 @@ modDirName :: ModuleName -> FilePath
 modDirName = toFilePath . fromString . intercalate "." . init . components 
 
 
-type ProjectPkg = (Project,GenericPackageDescription)
 
 -- | get Project and Generic Package Description
 
@@ -367,12 +375,12 @@ getExeFileAndCabalString :: BuildConfiguration
                          -> FilePath
                          -> [ProjectPkg] 
                          -> [((String,String),String)] 
-getExeFileAndCabalString bc srcpath pkgs = do 
+getExeFileAndCabalString bc pkgpath pkgs = do 
     p@(proj,desc) <- pkgs
     x@(x1,x2,x3,x4,x5) <- (getExecutables41Pkg . snd) p
     let cabalstr = mkExeStrInCabal x  
         filepath = x3</>x2
-    return ((bc_progbase bc</>projname proj</>filepath, srcpath </> x2), cabalstr)
+    return ((bc_progbase bc</>projname proj</>filepath, pkgpath </> "exe" </> x2), cabalstr)
 
 
 mkExeStrInCabal :: (String,String,String,String,String) -> String
@@ -380,7 +388,7 @@ mkExeStrInCabal (exename,filename,srcdir,compileopt,deps) =
   let tmpl = newSTMP execTemplate :: StringTemplate String 
   in toString . setAttribute "exename" exename
               . setAttribute "srcfilename"  filename  
-              . setAttribute "dirname" "src"
+              . setAttribute "dirname" "exe"
               . setAttribute "option" compileopt
               . setAttribute "dep" deps
               $ tmpl
