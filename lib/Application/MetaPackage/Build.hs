@@ -392,4 +392,4 @@ execTemplate = "\n\
 \  hs-source-dirs: $dirname$\n\
 \  ghc-options: $option$\n\
 \  Build-Depends: \n\
-\                   $dep$\n"
+\                   $dep$\n\n\n"

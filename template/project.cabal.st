@@ -2,7 +2,6 @@ Name:		$projname$
 Version:	0.0
 Synopsis:	
 Description: 	
-License-file:	LICENSE
 Author:		Ian-Woo Kim
 Maintainer: 	Ian-Woo Kim <ianwookim@gmail.com>
 Build-Type: 	Simple
