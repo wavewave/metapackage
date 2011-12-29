@@ -113,7 +113,7 @@ makeMetaPackage  bc mp pkgs = do
   let exelst = getExeFileAndCabalString bc mp pkgpath pkgs 
       exestr = concatMap snd exelst 
   mapM_ (linkExeSrcFile . fst) exelst 
-  makeCabalFile pkgpath mp pkgs allmodnames exestr
+  makeCabalFile pkgpath mp pkgs allmodnames allothermodnames exestr
 
 depString :: MetaProject -> [ProjectPkg] -> String 
 depString mp pkgs =  
@@ -137,13 +137,15 @@ getTemplate = do
 
 makeCabalFile :: FilePath -> MetaProject -> [ProjectPkg]
               -> [ModuleName]
+              -> [ModuleName]
               -> String
               -> IO ()
-makeCabalFile pkgpath mp pkgs modnames exestr = do 
+makeCabalFile pkgpath mp pkgs modnames othermodnames exestr = do 
   tmpl <- getTemplate
-  let exposedmodules = concatMap ("\n          "++) 
-                       . map (intercalate "." . components) 
-                       $ modnames
+  let mnameformatter = concatMap ("\n          "++) 
+                       . map (intercalate "." . components)  
+      exposedmodules = mnameformatter modnames
+      othermodules   = mnameformatter othermodnames
       libdep = depString mp pkgs 
   let replacement = [ ("projname",metaProjectName mp)
                     , ("licensetype", ""  ) 
@@ -151,6 +153,7 @@ makeCabalFile pkgpath mp pkgs modnames exestr = do
                     , ("libdep", libdep ) 
                     , ("exedep", "")
                     , ("exposedmodules", exposedmodules)
+                    , ("othermodules", othermodules)
                     , ("modulebase", "src")
                     , ("progtype", "") 
                     ] 

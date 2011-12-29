@@ -21,6 +21,6 @@ $libdep$
   Exposed-Modules: 
 $exposedmodules$
   Other-Modules: 
-$othermodule$
+$othermodules$
  
 		 
