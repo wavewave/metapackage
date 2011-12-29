@@ -1,5 +1,5 @@
 Name:		metapackage
-Version:	0.1.2
+Version:	0.1.2.0
 Synopsis:	umbrella package creation for ease of development
 Description: 	Make a meta package consisting of multiple packages using 
                 symbolic links for easier and faster compilation in

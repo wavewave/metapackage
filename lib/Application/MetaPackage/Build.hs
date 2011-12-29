@@ -69,7 +69,7 @@ showPkgInfos  bc mp pkgs = do
         (_,m) <- ns 
         return m
   -- mapM_ (putStrLn . show) allothermodnames        
-  let lst = getExeFileAndCabalString bc "" pkgs 
+  let lst = getExeFileAndCabalString bc mp "" pkgs 
   
   mapM_ (\(x,y)->do {putStrLn (show x); putStrLn y}) lst
 
@@ -110,7 +110,7 @@ makeMetaPackage  bc mp pkgs = do
                            makePaths_xxxHsFile pkgpath mp (ProgProj pkgname)
   mapM_ pathsAction allothermodnamestrings
 
-  let exelst = getExeFileAndCabalString bc pkgpath pkgs 
+  let exelst = getExeFileAndCabalString bc mp pkgpath pkgs 
       exestr = concatMap snd exelst 
   mapM_ (linkExeSrcFile . fst) exelst 
   makeCabalFile pkgpath mp pkgs allmodnames exestr
@@ -122,6 +122,9 @@ depString mp pkgs =
 
 depFormatter :: Dependency -> String 
 depFormatter (Dependency (PackageName pname) vr) = pname ++ versionRangeString vr
+
+replace :: (a -> a) -> (a -> Bool) -> a -> a 
+replace f c x = if c x then f x else x 
 
 
 getTemplate :: IO (STGroup String)
@@ -359,25 +362,35 @@ makePaths_xxxHsFile pkgpath mp proj = do
 
 -- | find executables 
 
-getExecutables41Pkg :: GenericPackageDescription 
+getExecutables41Pkg :: MetaProject
+                    -> GenericPackageDescription 
                     -> [(String,String,String,String,String)] 
-getExecutables41Pkg gdesc = do
+getExecutables41Pkg mp gdesc = do
     (exename,node) <- condExecutables gdesc
     let filename = (modulePath . condTreeData) node
         srcdir = (head . hsSourceDirs . buildInfo . condTreeData) node
         compileopt = intercalate " " . snd . head 
                      . options . buildInfo . condTreeData $ node  
-        deps = intercalate ", ". map depFormatter . condTreeConstraints 
+        deps = intercalate ", "
+               . map depFormatter 
+               . map (replace (const metapkgdep) checkIfInMetaPkg)
+               . condTreeConstraints 
                $ node 
     return (exename,filename,srcdir,compileopt,deps)  
+  where projnames = map projname . metaProjectPkg $ mp 
+        metapkgdep = Dependency (PackageName (metaProjectName mp)) anyVersion
+        checkIfInMetaPkg (Dependency (PackageName pname) _) =
+            pname `elem` projnames 
 
+ 
 getExeFileAndCabalString :: BuildConfiguration
+                         -> MetaProject
                          -> FilePath
                          -> [ProjectPkg] 
                          -> [((String,String),String)] 
-getExeFileAndCabalString bc pkgpath pkgs = do 
+getExeFileAndCabalString bc mp pkgpath pkgs = do 
     p@(proj,desc) <- pkgs
-    x@(x1,x2,x3,x4,x5) <- (getExecutables41Pkg . snd) p
+    x@(x1,x2,x3,x4,x5) <- (getExecutables41Pkg mp . snd) p
     let cabalstr = mkExeStrInCabal x  
         filepath = x3</>x2
     return ((bc_progbase bc</>projname proj</>filepath, pkgpath </> "exe" </> x2), cabalstr)
