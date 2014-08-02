@@ -1,16 +1,5 @@
-module Application.MetaPackage.Build where
+module MetaPackage where
 
-import Debug.Trace
-
-import Distribution.Package
-import Distribution.PackageDescription
-import Distribution.ModuleName
-import Distribution.Version
-
-import Application.MetaPackage.Config
-import Application.DevAdmin.Config 
-import Application.DevAdmin.Cabal
-import Application.DevAdmin.Project
 import Control.Applicative
 import Control.Monad hiding (mapM_,msum,forM_)
 import Data.Foldable
@@ -20,58 +9,36 @@ import Data.Maybe
 import Data.Monoid
 import Data.List (intercalate,group,sort,sortBy)
 
+import Distribution.Package
+import Distribution.PackageDescription
+import Distribution.ModuleName
+import Distribution.Version
 
 import System.Directory
 import System.FilePath
 import System.Process
-
 import Text.StringTemplate
 import Text.StringTemplate.Helpers
-
+--
+-- import Application.MetaPackage.Config
+-- import Application.DevAdmin.Config 
+import Application.DevAdmin.Cabal
+-- import Application.DevAdmin.Project
+--
 import Paths_metapackage
 import Prelude hiding (foldr1,foldr, mapM_, concatMap, concat, sum, elem)
 
-type ProjectPkg = (Project,GenericPackageDescription)
+newtype AProject = AProject { projname :: String
+                            , projloc :: FilePath }
+                deriving Show
 
+type ProjectPkg = (AProject,GenericPackageDescription)
 
-doMetaPkgAction :: (BuildConfiguration -> MetaProject -> [ProjectPkg] -> IO ())
-                -> BuildConfiguration -> ProjectConfiguration -> MetaProject -> IO ()
-doMetaPkgAction action bc pc mp  = do
-  gdescs <- getAllGenPkgDesc bc pc 
-  let epkgsdesc = getAllProjPkg gdescs mp 
-  either putStrLn (action bc mp) epkgsdesc 
+data MetaProject = MetaProject { metaProjectName :: String
+                               , metaProjectPkg :: [AProject]  
+                               }
+                 deriving (Show)
 
-
--- | just testing
-
-testMetaPackage :: BuildConfiguration -> ProjectConfiguration -> MetaProject -> IO ()
-testMetaPackage = doMetaPkgAction showPkgInfos
-
-
--- | starting make job
-
-buildMetaPackage :: BuildConfiguration -> ProjectConfiguration -> MetaProject -> IO ()
-buildMetaPackage = doMetaPkgAction makeMetaPackage 
-
--- | showPkgInfos 
-
-showPkgInfos :: BuildConfiguration -> MetaProject -> [ProjectPkg] -> IO ()
-showPkgInfos  bc mp pkgs = do
-  let allmodules = getAllModules pkgs  
-  (pkgpath,srcpath) <- testInitializeMetaPackage mp
-  let allmodnames = do 
-        (p,ns) <- allmodules
-        (fp,m) <- ns  
-        return m
-
-  let allothermodnames = do 
-        (_,ns) <- getAllOtherModules pkgs
-        (_,m) <- ns 
-        return m
-  -- mapM_ (putStrLn . show) allothermodnames        
-  let lst = getExeFileAndCabalString bc mp "" pkgs 
-  
-  mapM_ (\(x,y)->do {putStrLn (show x); putStrLn y}) lst
 
 linkExeSrcFile :: (FilePath,FilePath) -> IO ()
 linkExeSrcFile (src,dest) = do 
@@ -83,37 +50,6 @@ linkExeSrcFile (src,dest) = do
   
 
 
--- | driver IO action for make a meta package
-
-makeMetaPackage :: BuildConfiguration -> MetaProject 
-                -> [ProjectPkg]
-                -> IO ()
-makeMetaPackage  bc mp pkgs = do
-  let allmodules = getAllModules pkgs  
-  (pkgpath,srcpath) <- initializeMetaPackage mp
-  forM_ (map (projname . fst)  pkgs) $  \x ->   
-    system $ "ln -s " ++ bc_progbase bc </> x  ++  " " ++ pkgpath </> "data_" ++ x 
-
-  let allmodnames = do 
-        (_,ns) <- allmodules 
-        (_,m) <- ns  
-        return m
-
-  mapM_ (linkMod srcpath) . concatMap (absolutePathModuleAll bc <$> fst <*> snd) $ allmodules 
-  let allothermodnames = do 
-        (_,ns) <- getAllOtherModules pkgs
-        (_,m) <- ns 
-        return m
-      allothermodnamestrings = map components allothermodnames
-      pathsAction strs = when (take 6 (head strs) == "Paths_") $ do 
-                           let pkgname = drop 6 (head strs) 
-                           makePaths_xxxHsFile pkgpath mp (ProgProj pkgname)
-  mapM_ pathsAction allothermodnamestrings
-
-  let exelst = getExeFileAndCabalString bc mp pkgpath pkgs 
-      exestr = concatMap snd exelst 
-  mapM_ (linkExeSrcFile . fst) exelst 
-  makeCabalFile pkgpath mp pkgs allmodnames allothermodnames exestr
 
 depString :: MetaProject -> [ProjectPkg] -> String 
 depString mp pkgs =  
@@ -126,7 +62,6 @@ depFormatter (Dependency (PackageName pname) vr) = pname ++ versionRangeString v
 replace :: (a -> a) -> (a -> Bool) -> a -> a 
 replace f c x = if c x then f x else x 
 
-
 getTemplate :: IO (STGroup String)
 getTemplate = do 
   tmpldir <- getDataDir >>= return . (</> "template")
@@ -134,7 +69,6 @@ getTemplate = do
   
 
 -- | create a metapackage cabal file name. 
-
 makeCabalFile :: FilePath -> MetaProject -> [ProjectPkg]
               -> [ModuleName]
               -> [ModuleName]
@@ -162,7 +96,6 @@ makeCabalFile pkgpath mp pkgs modnames othermodnames exestr = do
                   
 
 -- | create metapackage directory and return such created directory names
-
 initializeMetaPackage :: MetaProject -> IO (FilePath,FilePath)
 initializeMetaPackage mp = do 
   cdir <- getCurrentDirectory 
@@ -176,7 +109,6 @@ initializeMetaPackage mp = do
   return (pkgpath,srcpath)
 
 -- | just for testing
-
 testInitializeMetaPackage :: MetaProject -> IO (FilePath,FilePath)
 testInitializeMetaPackage mp = do 
   cdir <- getCurrentDirectory 
@@ -185,38 +117,20 @@ testInitializeMetaPackage mp = do
   return (pkgpath,srcpath)
 
 
--- | for all modules 
-
-absolutePathModuleAll :: BuildConfiguration -> Project 
-                         -> [(FilePath,ModuleName)] -> [(FilePath,ModuleName)]
-absolutePathModuleAll bc proj xs = 
-  map (absolutePathModule bc proj) xs 
-
-
--- | relative path info to absolute path info for modules 
-
-absolutePathModule :: BuildConfiguration -> Project 
-                   -> (FilePath,ModuleName) -> (FilePath,ModuleName)
-absolutePathModule bc proj (fp,modname) = 
-  let absolutify dir = bc_progbase bc </> projname proj </> dir
-  in (absolutify fp,modname)
 
 -- | create module directory and link the original file in the destination.
-
 linkMod :: FilePath -> (FilePath,ModuleName) -> IO () 
 linkMod srcdir (fp,modname) = do 
   createModuleDirectory srcdir modname
   checkAndLinkModuleFile srcdir (fp,modname) 
 
 -- | check whether original source file exists and link it in the destination.
-
 checkAndLinkModuleFile :: FilePath -> (FilePath,ModuleName) -> IO () 
 checkAndLinkModuleFile srcdir (fp,modname) = do 
   let origfilename = fp </> (toFilePath modname)
   chk_hs <- doesFileExist (origfilename <.> "hs") 
   chk_hsc <- doesFileExist (origfilename <.> "hsc")
   chk_chs <- doesFileExist (origfilename <.> "chs")
-
   if chk_hs 
     then do system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "hs")
             return ()
@@ -229,7 +143,6 @@ checkAndLinkModuleFile srcdir (fp,modname) = do
         else return ()
 
 -- | create module directory if not exist 
-
 createModuleDirectory :: FilePath -> ModuleName -> IO () 
 createModuleDirectory basedir modname = do 
   let newdirname = basedir </> modDirName modname 
@@ -239,15 +152,13 @@ createModuleDirectory basedir modname = do
 
 
 -- | get module directory name (omitting last part of module) 
-
 modDirName :: ModuleName -> FilePath 
 modDirName = toFilePath . fromString . intercalate "." . init . components 
 
 
 
 -- | get Project and Generic Package Description
-
-getProjPkg :: M.Map String GenericPackageDescription -> Project  
+getProjPkg :: M.Map String GenericPackageDescription -> AProject  
            -> Either String ProjectPkg
 getProjPkg namepkgmap proj = 
   let mpkgdesc = M.lookup (projname proj) namepkgmap 
@@ -256,7 +167,6 @@ getProjPkg namepkgmap proj =
            mpkgdesc      
   
 -- | get a library pkg information for all packages in the metapackage
-
 getAllProjPkg :: [GenericPackageDescription] -> MetaProject 
               -> Either String [ProjectPkg]
 getAllProjPkg gdescs mp = 
@@ -267,25 +177,20 @@ getAllProjPkg gdescs mp =
 
 
 -- | get a library module information for a single package
-
 getModulesForOnePkg :: ProjectPkg -> [(FilePath,ModuleName)]
 getModulesForOnePkg (proj,desc) = getModules desc 
   
 
 -- | get all library module information
-
-getAllModules :: [ProjectPkg] -> [(Project,[(FilePath,ModuleName)])] 
+getAllModules :: [ProjectPkg] -> [(AProject,[(FilePath,ModuleName)])] 
 getAllModules pkgs = map ((,) <$> fst <*> getModulesForOnePkg) pkgs 
 
 
 -- | get a library dep information 
-
-
 getDepsForOnePkg :: ProjectPkg -> [Dependency]
 getDepsForOnePkg (proj,desc) = 
   let rlib = condLibrary desc
   in maybe [] (condTreeConstraints) rlib
-
 
 newtype DependencyEqName = DepEqName { unDepEqName :: Dependency } 
     deriving (Show)
@@ -293,7 +198,6 @@ newtype DependencyEqName = DepEqName { unDepEqName :: Dependency }
 instance Eq DependencyEqName where
   (DepEqName (Dependency n1 _))  == (DepEqName (Dependency n2 _))
     = n1 == n2
-
 
 dep_pkgname :: DependencyEqName -> PackageName
 dep_pkgname (DepEqName (Dependency n1 _)) = n1 
@@ -307,7 +211,6 @@ instance Monoid VersionRange where
 
 
 -- | get intersection dep
-
 intersectionDeps :: MetaProject -> [Dependency] -> [Dependency] 
 intersectionDeps mp deps = 
   let grouped = group . sortBy (compare `on` dep_pkgname) . map DepEqName $ deps
@@ -316,17 +219,14 @@ intersectionDeps mp deps =
                      PackageName pname -> if elem pname projnames
                                             then Nothing
                                             else Just (PackageName pname,x)
-      filtered = mapMaybe filterMP grouped
- 
+      filtered = mapMaybe filterMP grouped 
   in map (Dependency <$> fst <*> simplifyVersionRange . mconcat . map dep_vrange . snd) filtered
   
 -- | version to string 
-
 versionString :: Version -> String 
 versionString (Version b _ ) = intercalate "." (map show b)
 
 -- | version range to string for cabal file
-
 versionRangeString :: VersionRange -> String
 versionRangeString AnyVersion = "" 
 versionRangeString (ThisVersion v) = "==" ++ versionString v
@@ -340,19 +240,15 @@ versionRangeString (WildcardVersion v) = "==" ++ versionString v ++ ".*"
 versionRangeString _ = "???"
 
 -- | get a library 'other module' information for a single package
-
 getOtherModules41Pkg :: ProjectPkg -> [(FilePath,ModuleName)]
 getOtherModules41Pkg (proj,desc) = getOtherModules desc
 
 -- | get all other module information
-
-getAllOtherModules :: [ProjectPkg] -> [(Project,[(FilePath,ModuleName)])]
+getAllOtherModules :: [ProjectPkg] -> [(AProject,[(FilePath,ModuleName)])]
 getAllOtherModules pkgs = map ((,) <$> fst <*> getOtherModules41Pkg) pkgs
 
-
 -- | create Paths_package.hs for a package
- 
-makePaths_xxxHsFile :: FilePath -> MetaProject -> Project -> IO ()
+makePaths_xxxHsFile :: FilePath -> MetaProject -> AProject -> IO ()
 makePaths_xxxHsFile pkgpath mp proj = do 
   tmpl <- getTemplate
   let pkgname = projname proj 
@@ -364,7 +260,6 @@ makePaths_xxxHsFile pkgpath mp proj = do
   writeFile (pkgpath </> "src" </> "Paths_" ++ pkgname <.> "hs") hsstr
 
 -- | find executables 
-
 getExecutables41Pkg :: MetaProject
                     -> GenericPackageDescription 
                     -> [(String,String,String,String,String)] 
@@ -385,20 +280,7 @@ getExecutables41Pkg mp gdesc = do
         checkIfInMetaPkg (Dependency (PackageName pname) _) =
             pname `elem` projnames 
 
- 
-getExeFileAndCabalString :: BuildConfiguration
-                         -> MetaProject
-                         -> FilePath
-                         -> [ProjectPkg] 
-                         -> [((String,String),String)] 
-getExeFileAndCabalString bc mp pkgpath pkgs = do 
-    p@(proj,desc) <- pkgs
-    x@(x1,x2,x3,x4,x5) <- (getExecutables41Pkg mp . snd) p
-    let cabalstr = mkExeStrInCabal x  
-        filepath = x3</>x2
-    return ((bc_progbase bc</>projname proj</>filepath, pkgpath </> "exe" </> x2), cabalstr)
-
-
+-- |
 mkExeStrInCabal :: (String,String,String,String,String) -> String
 mkExeStrInCabal (exename,filename,srcdir,compileopt,deps) = 
   let tmpl = newSTMP execTemplate :: StringTemplate String 
@@ -409,6 +291,7 @@ mkExeStrInCabal (exename,filename,srcdir,compileopt,deps) =
               . setAttribute "dep" deps
               $ tmpl
 
+-- |
 execTemplate :: String 
 execTemplate = "\n\
 \Executable $exename$\n\

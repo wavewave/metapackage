@@ -18,35 +18,23 @@ data-files:
 
 Executable metapackage
   Main-is: metapackage.hs
-  hs-source-dirs: exe
+  hs-source-dirs: src
   ghc-options: 	-Wall -O2 -threaded -funbox-strict-fields -fno-warn-unused-do-bind
   ghc-prof-options: -caf-all -auto-all
   Build-Depends: 
-                   base>4, mtl>2, directory, filepath,
-                   cmdargs, metapackage
+                   base == 4.*, 
+                   mtl>2, 
+                   directory,
+                   filepath,
+                   -- cmdargs,
+                   devadmin,  
+                   Cabal, 
+                   -- configurator,
+                   containers, 
+                   process, 
+                   HStringTemplate 
 
-Library
-  hs-source-dirs: lib
-  ghc-options: 	-Wall -O2 -threaded -funbox-strict-fields -fno-warn-unused-do-bind
-  ghc-prof-options: -caf-all -auto-all
-  Build-Depends: 
-                   base>4, mtl>2, directory, filepath,
-                   cmdargs >= 0.7 && < 0.10, 
-                   devadmin >= 0.4.0.999 && < 0.5,  
-                   Cabal >= 1.8 && < 1.12, 
-                   configurator == 0.2.*,
-                   containers == 0.4.*, 
-                   process == 1.0.*, 
-                   HStringTemplate == 0.6.*, 
-                   HStringTemplateHelpersIW == 0.0.*
-  Exposed-Modules: 
-                   Application.MetaPackage.ProgType
-                   Application.MetaPackage.Job
-                   Application.MetaPackage.Command
-                   Application.MetaPackage.Config 
-                   Application.MetaPackage.Build
-  Other-Modules: 
+  Other-modules: 
                    Paths_metapackage
-
  
 		 
