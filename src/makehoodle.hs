@@ -17,7 +17,7 @@ extralines = "  c-sources: \n\
 \  cc-options:      -Wno-pointer-to-int-cast -std=gnu99 -DDEBUG  -fPIC\n\
 \  extra-libraries: X11 Xi dl pthread\n"
 
-testmetaproj base = 
+hoodleproj base = 
     MetaProject "metahoodle" [ AProject "hoodle-types"   (base </> "hoodle-types")
                              , AProject "xournal-types"  (base </> "xournal-types")
                              , AProject "xournal-parser" (base </> "xournal-parser")
@@ -40,6 +40,6 @@ main = do
   args <- getArgs
   putStrLn "makehoodle"
   -- putStrLn extralines
-  pkgpath <- makeMetaPackage (testmetaproj (args !! 0)) extralines
+  pkgpath <- makeMetaPackage (hoodleproj (args !! 0)) extralines
   copyextra (args !! 0) pkgpath
 
