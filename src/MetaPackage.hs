@@ -28,10 +28,10 @@ import Application.DevAdmin.Cabal
 import Paths_metapackage
 import Prelude hiding (foldr1,foldr, mapM_, concatMap, concat, sum, elem)
 
-newtype AProject = AProject { projname :: String
-                            , projloc :: FilePath }
-                deriving Show
-
+data AProject = AProject { projname :: String
+                         , projloc :: FilePath }
+              deriving Show
+ 
 type ProjectPkg = (AProject,GenericPackageDescription)
 
 data MetaProject = MetaProject { metaProjectName :: String
@@ -48,9 +48,6 @@ linkExeSrcFile (src,dest) = do
     system $ "ln -s " ++ src ++ " " ++ dest
     return ()
   
-
-
-
 depString :: MetaProject -> [ProjectPkg] -> String 
 depString mp pkgs =  
   let depsall = intersectionDeps mp . concatMap getDepsForOnePkg $ pkgs
