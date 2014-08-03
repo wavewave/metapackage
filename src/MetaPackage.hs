@@ -32,7 +32,7 @@ data AProject = AProject { projname :: String
                          , projloc :: FilePath }
               deriving Show
  
-type ProjectPkg = (AProject,GenericPackageDescription)
+type AProjectParsed = (AProject,GenericPackageDescription)
 
 data MetaProject = MetaProject { metaProjectName :: String
                                , metaProjectPkg :: [AProject]  
@@ -48,7 +48,7 @@ linkExeSrcFile (src,dest) = do
     system $ "ln -s " ++ src ++ " " ++ dest
     return ()
   
-depString :: MetaProject -> [ProjectPkg] -> String 
+depString :: MetaProject -> [AProjectParsed] -> String 
 depString mp pkgs =  
   let depsall = intersectionDeps mp . concatMap getDepsForOnePkg $ pkgs
   in intercalate ",\n" . map (("         " ++) . depFormatter) $ depsall
@@ -66,7 +66,7 @@ getTemplate = do
   
 
 -- | create a metapackage cabal file name. 
-makeCabalFile :: FilePath -> MetaProject -> [ProjectPkg]
+makeCabalFile :: FilePath -> MetaProject -> [AProjectParsed]
               -> [ModuleName]
               -> [ModuleName]
               -> String
@@ -156,7 +156,7 @@ modDirName = toFilePath . fromString . intercalate "." . init . components
 
 -- | get Project and Generic Package Description
 getProjPkg :: M.Map String GenericPackageDescription -> AProject  
-           -> Either String ProjectPkg
+           -> Either String AProjectParsed
 getProjPkg namepkgmap proj = 
   let mpkgdesc = M.lookup (projname proj) namepkgmap 
   in maybe (Left ("package " ++ projname proj ++ " doesn't exist"))
@@ -165,7 +165,7 @@ getProjPkg namepkgmap proj =
   
 -- | get a library pkg information for all packages in the metapackage
 getAllProjPkg :: [GenericPackageDescription] -> MetaProject 
-              -> Either String [ProjectPkg]
+              -> Either String [AProjectParsed]
 getAllProjPkg gdescs mp = 
   let namepkgpair = map ((,) <$> getPkgName <*> id) gdescs 
       namepkgmap = M.fromList namepkgpair
@@ -174,17 +174,17 @@ getAllProjPkg gdescs mp =
 
 
 -- | get a library module information for a single package
-getModulesForOnePkg :: ProjectPkg -> [(FilePath,ModuleName)]
+getModulesForOnePkg :: AProjectParsed -> [(FilePath,ModuleName)]
 getModulesForOnePkg (proj,desc) = getModules desc 
   
 
 -- | get all library module information
-getAllModules :: [ProjectPkg] -> [(AProject,[(FilePath,ModuleName)])] 
+getAllModules :: [AProjectParsed] -> [(AProject,[(FilePath,ModuleName)])] 
 getAllModules pkgs = map ((,) <$> fst <*> getModulesForOnePkg) pkgs 
 
 
 -- | get a library dep information 
-getDepsForOnePkg :: ProjectPkg -> [Dependency]
+getDepsForOnePkg :: AProjectParsed -> [Dependency]
 getDepsForOnePkg (proj,desc) = 
   let rlib = condLibrary desc
   in maybe [] (condTreeConstraints) rlib
@@ -237,11 +237,11 @@ versionRangeString (WildcardVersion v) = "==" ++ versionString v ++ ".*"
 versionRangeString _ = "???"
 
 -- | get a library 'other module' information for a single package
-getOtherModules41Pkg :: ProjectPkg -> [(FilePath,ModuleName)]
+getOtherModules41Pkg :: AProjectParsed -> [(FilePath,ModuleName)]
 getOtherModules41Pkg (proj,desc) = getOtherModules desc
 
 -- | get all other module information
-getAllOtherModules :: [ProjectPkg] -> [(AProject,[(FilePath,ModuleName)])]
+getAllOtherModules :: [AProjectParsed] -> [(AProject,[(FilePath,ModuleName)])]
 getAllOtherModules pkgs = map ((,) <$> fst <*> getOtherModules41Pkg) pkgs
 
 -- | create Paths_package.hs for a package

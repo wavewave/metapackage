@@ -35,6 +35,8 @@ Executable metapackage
                    HStringTemplate 
 
   Other-modules: 
+                   Driver
+                   MetaPackage
                    Paths_metapackage
  
 		 
