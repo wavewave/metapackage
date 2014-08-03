@@ -63,27 +63,25 @@ makeMetaPackage mp = do
         xpath = (projloc . fst) x
     in system $ "ln -s " ++ xpath ++  " " ++ pkgpath </> "data_" ++ xname
 
-  let allmodnames = do 
-        (_,ns) <- allmodules 
-        (_,m) <- ns  
-        return m
-
   mapM_ (linkMod srcpath) . concatMap (\(proj,lst) -> map (absolutePathModule proj) lst) $ allmodules 
 
-
-  {- 
-  let allothermodnames = do 
-        (_,ns) <- getAllOtherModules pkgs
-        (_,m) <- ns 
-        return m
+  let allmodnames      = do (_,ns) <- allmodules 
+                            (_,m) <- ns  
+                            return m
+      allothermodnames = do (_,ns) <- getAllOtherModules parsedpkgs
+                            (_,m) <- ns 
+                            return m
       allothermodnamestrings = map components allothermodnames
       pathsAction strs = when (take 6 (head strs) == "Paths_") $ do 
-                           let pkgname = drop 6 (head strs) 
-                           makePaths_xxxHsFile pkgpath mp (ProgProj pkgname)
+                           let pname = drop 6 (head strs) 
+                           makePaths_xxxHsFile pkgpath mp pname
   mapM_ pathsAction allothermodnamestrings
-
+  
+  {-
   let exelst = getExeFileAndCabalString bc mp pkgpath pkgs 
       exestr = concatMap snd exelst 
   mapM_ (linkExeSrcFile . fst) exelst 
-  makeCabalFile pkgpath mp pkgs allmodnames allothermodnames exestr
   -}
+
+  makeCabalFile pkgpath mp parsedpkgs allmodnames allothermodnames "" -- exestr
+  

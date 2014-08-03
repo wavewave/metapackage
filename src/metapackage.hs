@@ -8,9 +8,11 @@ module Main where
 import Driver
 import MetaPackage
 
-testmetaproj = MetaProject "metahoodle" [ AProject "hoodle-render" "/home/wavewave/repo/src/hoodle/hoodle-render"
+testmetaproj = MetaProject "metahoodle" [ AProject "hoodle-types" "/home/wavewave/repo/src/hoodle/hoodle-types"
+                                        , AProject "hoodle-parser" "/home/wavewave/repo/src/hoodle/hoodle-parser"
+                                        , AProject "hoodle-builder" "/home/wavewave/repo/src/hoodle/hoodle-builder"
+                                        , AProject "hoodle-render" "/home/wavewave/repo/src/hoodle/hoodle-render"
                                         , AProject "hoodle-core" "/home/wavewave/repo/src/hoodle/hoodle-core" 
-                                        , AProject "hoodle-types" "/home/wavewave/repo/src/hoodle/hoodle-types"
                                         ]   
 
 main :: IO () 

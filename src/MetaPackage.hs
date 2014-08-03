@@ -245,16 +245,15 @@ getAllOtherModules :: [AProjectParsed] -> [(AProject,[(FilePath,ModuleName)])]
 getAllOtherModules pkgs = map ((,) <$> fst <*> getOtherModules41Pkg) pkgs
 
 -- | create Paths_package.hs for a package
-makePaths_xxxHsFile :: FilePath -> MetaProject -> AProject -> IO ()
-makePaths_xxxHsFile pkgpath mp proj = do 
+makePaths_xxxHsFile :: FilePath -> MetaProject -> String -> IO ()
+makePaths_xxxHsFile pkgpath mp pname = do 
   tmpl <- getTemplate
-  let pkgname = projname proj 
-      datapath = pkgpath </> "data_" ++ pkgname 
-      replacement = [ ( "pkgname", pkgname )
+  let datapath = pkgpath </> "data_" ++ pname 
+      replacement = [ ( "pkgname", pname )
                     , ( "datapath", datapath )
                     ] 
       hsstr = renderTemplateGroup tmpl replacement "Paths_xxx.hs" 
-  writeFile (pkgpath </> "src" </> "Paths_" ++ pkgname <.> "hs") hsstr
+  writeFile (pkgpath </> "src" </> "Paths_" ++ pname <.> "hs") hsstr
 
 -- | find executables 
 getExecutables41Pkg :: MetaProject
