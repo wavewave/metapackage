@@ -61,7 +61,6 @@ linkExeSrcFile (src,dest) = do
   chk_dest <- doesFileExist dest 
   when (chk_src && not chk_dest) $ do 
     linkFile src dest    
-    -- system $ "ln -s " ++ src ++ " " ++ dest
     return ()
   
 depString :: MetaProject -> [AProjectParsed] -> String 

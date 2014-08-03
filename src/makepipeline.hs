@@ -27,5 +27,3 @@ main = do
   
   makeMetaPackage (pipelineproj (args !! 0)) ""
   return ()
-  -- (pkgpath,srcpath) <- initializeMetaPackage testmetaproj
-  -- print (pkgpath,srcpath)

@@ -36,36 +36,17 @@ absolutePathModule proj (fp,modname) =
 hyphenToUnderscore :: String -> String
 hyphenToUnderscore = map (\x -> if x == '-' then '_' else x)
 
-{-
-getAllGenPkgDesc :: BuildConfiguration -> ProjectConfiguration 
-                 -> IO [GenericPackageDescription]
-getAllGenPkgDesc bc pc = do 
-  let projects = pc_projects pc
-  mapM parseAProject projects
--}
-
-{-
-doMetaPkgAction :: (BuildConfiguration -> MetaProject -> [ProjectPkg] -> IO ())
-                -> BuildConfiguration -> ProjectConfiguration -> MetaProject -> IO ()
-doMetaPkgAction action bc pc mp  = do
-  gdescs <- getAllGenPkgDesc bc pc 
-  let epkgsdesc = getAllProjPkg gdescs mp 
-  either putStrLn (action bc mp) epkgsdesc 
--}
-
 -- | driver IO action for make a meta package
 makeMetaPackage :: MetaProject -> String -> IO FilePath
 makeMetaPackage mp extra = do
   parsedpkgs <- mapM (\x -> (x,) <$> parseAProject x) (metaProjectPkg mp)
   let allmodules = getAllModules parsedpkgs  
   (pkgpath,srcpath) <- initializeMetaPackage mp
-  -- print allmodules
 
   forM_ parsedpkgs $  \x ->
     let xname = (projname . fst) x  
         xpath = (projloc . fst) x
     in linkDirectory xpath (pkgpath </> "data_" ++ (hyphenToUnderscore xname))
-       -- system $ "ln -s " ++ xpath ++  " " ++ pkgpath </> "data_" ++ (hyphenToUnderscore xname)
 
   mapM_ (linkMod srcpath) . concatMap (\(proj,lst) -> map (absolutePathModule proj) lst) $ allmodules 
 
@@ -79,7 +60,7 @@ makeMetaPackage mp extra = do
       pathsAction strs = when (take 6 (head strs) == "Paths_") $ do 
                            let pname = drop 6 (head strs) 
                            makePaths_xxxHsFile pkgpath mp pname
-  mapM_ pathsAction allothermodnamestrings
+  mapM_ pathsAction (allothermodnamestrings ++ map components allmodnames)
   
   {-
   let exelst = getExeFileAndCabalString bc mp pkgpath pkgs 
