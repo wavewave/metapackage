@@ -146,15 +146,12 @@ checkAndLinkModuleFile srcdir (fp,modname) = do
   chk_chs <- doesFileExist (origfilename <.> "chs")
   if chk_hs 
     then do linkFile (origfilename <.> "hs") (srcdir </>  toFilePath modname <.> "hs")
-            -- system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "hs")
             return ()
     else if chk_hsc 
       then do linkFile (origfilename <.> "hsc") (srcdir </>  toFilePath modname <.> "hsc")
-              -- system $ "ln -s " ++ (origfilename <.> "hsc") ++ " " ++ (srcdir </>  toFilePath modname <.> "hsc")
               return ()
       else if chk_chs
         then do linkFile (origfilename <.> "chs") (srcdir </>  toFilePath modname <.> "chs")
-                -- system $ "ln -s " ++ (origfilename <.> "chs") ++ " " ++ (srcdir </>  toFilePath modname <.> "chs")
                 return ()
         else return ()
 
@@ -169,7 +166,10 @@ createModuleDirectory basedir modname = do
 
 -- | get module directory name (omitting last part of module) 
 modDirName :: ModuleName -> FilePath 
-modDirName = toFilePath . fromString . intercalate "." . init . components 
+modDirName mname = let initpart = (init . components) mname
+                   in if null initpart 
+                        then "" 
+                        else (toFilePath . fromString . intercalate "." ) initpart 
 
 
 
