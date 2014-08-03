@@ -8,18 +8,11 @@ module Main where
 import Driver
 import MetaPackage
 
-testmetaproj = MetaProject "metahoodle" [ AProject "hoodle-types" "/home/wavewave/repo/src/hoodle/hoodle-types"
-                                        , AProject "xournal-types" "/home/wavewave/repo/src/hoodle/xournal-types"
-                                        , AProject "xournal-parser" "/home/wavewave/repo/src/hoodle/xournal-parser"
-                                        , AProject "hoodle-parser" "/home/wavewave/repo/src/hoodle/hoodle-parser"
-                                        , AProject "hoodle-builder" "/home/wavewave/repo/src/hoodle/hoodle-builder"
-                                        , AProject "hoodle-render" "/home/wavewave/repo/src/hoodle/hoodle-render"
-                                        , AProject "hoodle-core" "/home/wavewave/repo/src/hoodle/hoodle-core" 
-                                        ]   
-
 main :: IO () 
 main = do 
   putStrLn "metapackage"
-  makeMetaPackage testmetaproj
+  
+
+  return ()
   -- (pkgpath,srcpath) <- initializeMetaPackage testmetaproj
   -- print (pkgpath,srcpath)

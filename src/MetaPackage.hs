@@ -69,9 +69,9 @@ getTemplate = do
 makeCabalFile :: FilePath -> MetaProject -> [AProjectParsed]
               -> [ModuleName]
               -> [ModuleName]
-              -> String
+              -> String -- ^ extra
               -> IO ()
-makeCabalFile pkgpath mp pkgs modnames othermodnames exestr = do 
+makeCabalFile pkgpath mp pkgs modnames othermodnames extra {- exestr -} = do 
   tmpl <- getTemplate
   let mnameformatter = concatMap ("\n          "++) 
                        . map (intercalate "." . components)  
@@ -80,13 +80,14 @@ makeCabalFile pkgpath mp pkgs modnames othermodnames exestr = do
       libdep = depString mp pkgs 
   let replacement = [ ("projname",metaProjectName mp)
                     , ("licensetype", ""  ) 
-                    , ("executables", exestr )
+                    -- , ("executables", exestr )
                     , ("libdep", libdep ) 
                     , ("exedep", "")
                     , ("exposedmodules", exposedmodules)
                     , ("othermodules", othermodules)
                     , ("modulebase", "src")
                     , ("progtype", "") 
+                    , ("extralines", extra)
                     ] 
   let cabalstr = renderTemplateGroup tmpl replacement "project.cabal"
   writeFile (pkgpath </> metaProjectName mp <.> "cabal") cabalstr 
@@ -113,7 +114,9 @@ testInitializeMetaPackage mp = do
       srcpath = cdir </> (metaProjectName mp </> "src")
   return (pkgpath,srcpath)
 
-
+-- | 
+linkFile :: FilePath -> FilePath -> IO ()
+linkFile src tgt = system ("ln -s " ++ src ++ " " ++ tgt) >> return ()
 
 -- | create module directory and link the original file in the destination.
 linkMod :: FilePath -> (FilePath,ModuleName) -> IO () 
