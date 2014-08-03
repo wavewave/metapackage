@@ -32,7 +32,7 @@ copyextra :: FilePath -> FilePath -> IO ()
 copyextra base pkgpath = do
     let filelist = map (\x->(base</>"hoodle-core"</>"csrc"</>x , pkgpath</>"csrc"</>x) )
                        [ "c_initdevice.c", "c_initdevice.h", "template-hsc-gtk2hs.h", "XInput.c", "XInput.h" ] 
-    createDirectory (pkgpath </> "csrc")
+    createDirectoryIfNotExist (pkgpath </> "csrc")
     mapM_ (uncurry linkFile) filelist
 
 main :: IO () 

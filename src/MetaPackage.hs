@@ -20,10 +20,7 @@ import System.Process
 import Text.StringTemplate
 import Text.StringTemplate.Helpers
 --
--- import Application.MetaPackage.Config
--- import Application.DevAdmin.Config 
 import Application.DevAdmin.Cabal
--- import Application.DevAdmin.Project
 --
 import Paths_metapackage
 import Prelude hiding (foldr1,foldr, mapM_, concatMap, concat, sum, elem)
@@ -40,12 +37,31 @@ data MetaProject = MetaProject { metaProjectName :: String
                  deriving (Show)
 
 
+createDirectoryIfNotExist :: FilePath -> IO ()
+createDirectoryIfNotExist fp = do
+    putStrLn fp
+    doesDirectoryExist fp >>= \b -> when (not b) (createDirectory fp)
+
+-- | 
+linkFile :: FilePath -> FilePath -> IO ()
+linkFile src tgt = do
+    doesFileExist tgt >>= \b -> when b (removeFile tgt)
+    system ("ln -s " ++ src ++ " " ++ tgt) >> return ()
+
+-- | 
+linkDirectory :: FilePath -> FilePath -> IO ()
+linkDirectory src tgt = do
+    doesDirectoryExist tgt >>= \b -> when b (removeFile tgt)
+    system ("ln -s " ++ src ++ " " ++ tgt) >> return ()
+
+
 linkExeSrcFile :: (FilePath,FilePath) -> IO ()
 linkExeSrcFile (src,dest) = do 
   chk_src <- doesFileExist src
   chk_dest <- doesFileExist dest 
   when (chk_src && not chk_dest) $ do 
-    system $ "ln -s " ++ src ++ " " ++ dest
+    linkFile src dest    
+    -- system $ "ln -s " ++ src ++ " " ++ dest
     return ()
   
 depString :: MetaProject -> [AProjectParsed] -> String 
@@ -100,9 +116,9 @@ initializeMetaPackage mp = do
   let pkgpath = cdir </> (metaProjectName mp)
       srcpath = cdir </> metaProjectName mp </> "src"
       exepath = cdir </> (metaProjectName mp) </> "exe"
-  createDirectory pkgpath
-  createDirectory srcpath 
-  createDirectory exepath
+  createDirectoryIfNotExist pkgpath
+  createDirectoryIfNotExist srcpath 
+  createDirectoryIfNotExist exepath
 
   return (pkgpath,srcpath)
 
@@ -114,9 +130,6 @@ testInitializeMetaPackage mp = do
       srcpath = cdir </> (metaProjectName mp </> "src")
   return (pkgpath,srcpath)
 
--- | 
-linkFile :: FilePath -> FilePath -> IO ()
-linkFile src tgt = system ("ln -s " ++ src ++ " " ++ tgt) >> return ()
 
 -- | create module directory and link the original file in the destination.
 linkMod :: FilePath -> (FilePath,ModuleName) -> IO () 
@@ -132,13 +145,16 @@ checkAndLinkModuleFile srcdir (fp,modname) = do
   chk_hsc <- doesFileExist (origfilename <.> "hsc")
   chk_chs <- doesFileExist (origfilename <.> "chs")
   if chk_hs 
-    then do system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "hs")
+    then do linkFile (origfilename <.> "hs") (srcdir </>  toFilePath modname <.> "hs")
+            -- system $ "ln -s " ++ (origfilename <.> "hs") ++ " " ++ (srcdir </>  toFilePath modname <.> "hs")
             return ()
     else if chk_hsc 
-      then do system $ "ln -s " ++ (origfilename <.> "hsc") ++ " " ++ (srcdir </>  toFilePath modname <.> "hsc")
+      then do linkFile (origfilename <.> "hsc") (srcdir </>  toFilePath modname <.> "hsc")
+              -- system $ "ln -s " ++ (origfilename <.> "hsc") ++ " " ++ (srcdir </>  toFilePath modname <.> "hsc")
               return ()
       else if chk_chs
-        then do system $ "ln -s " ++ (origfilename <.> "chs") ++ " " ++ (srcdir </>  toFilePath modname <.> "chs")
+        then do linkFile (origfilename <.> "chs") (srcdir </>  toFilePath modname <.> "chs")
+                -- system $ "ln -s " ++ (origfilename <.> "chs") ++ " " ++ (srcdir </>  toFilePath modname <.> "chs")
                 return ()
         else return ()
 

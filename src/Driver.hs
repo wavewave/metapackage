@@ -64,7 +64,8 @@ makeMetaPackage mp extra = do
   forM_ parsedpkgs $  \x ->
     let xname = (projname . fst) x  
         xpath = (projloc . fst) x
-    in system $ "ln -s " ++ xpath ++  " " ++ pkgpath </> "data_" ++ (hyphenToUnderscore xname)
+    in linkDirectory xpath (pkgpath </> "data_" ++ (hyphenToUnderscore xname))
+       -- system $ "ln -s " ++ xpath ++  " " ++ pkgpath </> "data_" ++ (hyphenToUnderscore xname)
 
   mapM_ (linkMod srcpath) . concatMap (\(proj,lst) -> map (absolutePathModule proj) lst) $ allmodules 
 
