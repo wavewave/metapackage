@@ -9,8 +9,7 @@ import MetaPackage
 pipelineproj base = 
     MetaProject "metapipeline" [ AProject "webdav-manager"      (base </> "webdav-manager")
                                , AProject "pipeline-eventgen"   (base </> "pipeline-eventgen")
- 
-                               , AProject "pipeline"            (base </> "pipeline" </> "haskell-pipeline")
+                               -- , AProject "pipeline"            (base </> "pipeline" </> "haskell-pipeline")
                                , AProject "madgraph-auto-model" (base </> "madgraph-auto-model")
                                , AProject "devadmin"            (base </> "devadmin")
                                , AProject "madgraph-auto"       (base </> "madgraph-auto")
@@ -19,9 +18,10 @@ pipelineproj base =
                                , AProject "HEPUtil"             (base </> "HEPUtil")
                                , AProject "conduit-util"        (base </> "conduit-util")
                                , AProject "LHCOAnalysis-type"   (base </> "LHCOAnalysis-type")
+                               , AProject "LHCOAnalysis"        (base </> "LHCOAnalysis")
                                , AProject "evchain"             (base </> "evchain")
                                , AProject "jobqueue-server"     (base </> "jobqueue-server" </> "oldcode" </> "jobqueue-server")
-                               -- , AProject "jobqueue-client"     (base </> "jobqueue-server" </> "oldcode" </> "jobqueue-client")
+                               , AProject "jobqueue-client"     (base </> "jobqueue-server" </> "oldcode" </> "jobqueue-client")
                                , AProject "jobqueue-common"     (base </> "jobqueue-server" </> "oldcode" </> "jobqueue-common")
 
                                , AProject "configparser"        (base </> "configparser")
