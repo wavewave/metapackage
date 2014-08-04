@@ -23,8 +23,10 @@ pipelineproj base =
                                , AProject "jobqueue-server"     (base </> "jobqueue-server" </> "oldcode" </> "jobqueue-server")
                                , AProject "jobqueue-client"     (base </> "jobqueue-server" </> "oldcode" </> "jobqueue-client")
                                , AProject "jobqueue-common"     (base </> "jobqueue-server" </> "oldcode" </> "jobqueue-common")
+                               
+                               , AProject "jobqueue-sender"     (base </> "jobqueue-sender")
 
-                               , AProject "configparser"        (base </> "configparser")
+                               -- , AProject "configparser"        (base </> "configparser")
 
                                ]   
 
